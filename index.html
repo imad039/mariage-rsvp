@@ -3,23 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Confirmation de présence — Mariage</title>
+<title>RSVP Mariage Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Roboto:wght@400;500&display=swap');
-body {margin:0;font-family:'Roboto',sans-serif;background:linear-gradient(135deg,#f5f0e6,#e0d7c6);display:flex;justify-content:center;align-items:center;min-height:100vh;}
-.container {background:white;border-radius:20px;padding:40px;width:100%;max-width:450px;box-shadow:0 10px 30px rgba(0,0,0,0.15);text-align:center;}
-h1 {font-family:'Playfair Display',serif;font-size:28px;margin-bottom:10px;color:#5a4633;}
-p {color:#6b5e50;font-size:14px;margin-bottom:20px;}
-input, select, button {width:100%;padding:10px;margin-top:8px;margin-bottom:15px;border-radius:10px;border:1px solid #d1c4b2;font-size:14px;box-sizing:border-box;}
-input:focus, select:focus {outline:none;border-color:#b9975b;box-shadow:0 0 5px #b9975b;}
-button {background:#b9975b;color:white;font-weight:500;cursor:pointer;border:none;transition:0.3s;}
-button:hover {background:#9e7f44;}
-.message {margin-top:15px;font-weight:bold;color:green;}
-.error {color:red;margin-bottom:10px;}
-.hidden {display:none;}
-table {width:100%;border-collapse:collapse;margin-top:20px;}
-th,td {padding:10px;border:1px solid #d1c4b2;text-align:center;}
-th {background:#b9975b;color:white;}
+body {
+    margin:0; font-family:'Roboto',sans-serif;
+    background: linear-gradient(135deg,#f5f0e6,#e0d7c6);
+    display:flex; justify-content:center; align-items:center;
+    min-height:100vh;
+}
+.container {
+    background:white; border-radius:20px; padding:40px; width:100%; max-width:600px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.15); text-align:center; transition:all 0.5s;
+}
+h1 { font-family:'Playfair Display',serif; font-size:28px; margin-bottom:10px; color:#5a4633; }
+p { color:#6b5e50; font-size:14px; margin-bottom:20px; }
+input, select, button, textarea {
+    width:100%; padding:10px; margin-top:8px; margin-bottom:15px; border-radius:10px;
+    border:1px solid #d1c4b2; font-size:14px; box-sizing:border-box; transition:0.3s;
+}
+input:focus, select:focus, textarea:focus { outline:none; border-color:#b9975b; box-shadow:0 0 5px #b9975b; }
+button { background:#b9975b; color:white; font-weight:500; cursor:pointer; border:none; transition:0.3s; }
+button:hover { background:#9e7f44; }
+.error { color:red; margin-bottom:10px; }
+.hidden { display:none; opacity:0; transition:opacity 0.5s; }
+.show { display:block; opacity:1; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th,td { padding:10px; border:1px solid #d1c4b2; text-align:center; }
+th { background:#b9975b; color:white; }
+#counter { margin-top:15px; font-weight:bold; color:#5a4633; }
+.export-btn { margin-top:15px; padding:10px 15px; background:#b9975b; color:white; border:none; border-radius:10px; cursor:pointer; }
+.export-btn:hover { background:#9e7f44; }
+#countdown { margin-top:15px; font-weight:bold; color:#5a4633; font-size:16px; }
 </style>
 </head>
 <body>
@@ -27,7 +44,7 @@ th {background:#b9975b;color:white;}
     <h1>Confirmation de présence</h1>
     <p>Entrez votre code à 6 chiffres pour confirmer votre présence.</p>
 
-    <div id="form-step1">
+    <div id="form-step1" class="show">
         <input type="text" id="code" placeholder="Ex: 123456" maxlength="6">
         <button onclick="checkCode()">Valider le code</button>
         <div id="error" class="error"></div>
@@ -43,103 +60,129 @@ th {background:#b9975b;color:white;}
         </select>
         <label>Nombre d'accompagnants :</label>
         <select id="plusOnes"></select>
+        <div id="accompanistNames"></div>
+        <label>Commentaires (optionnel) :</label>
+        <textarea id="comments" placeholder="Ex: On viendra avec joie !"></textarea>
         <button onclick="submitRsvp()">Envoyer ma réponse</button>
     </div>
 
     <div id="thankyou" class="hidden">
         <h2>Merci pour votre réponse 💕</h2>
+        <p id="counter"></p>
+        <p id="countdown"></p>
     </div>
 </div>
 
 <script>
+// Base de données invités
 const GUESTS_DB = {
-    "123456": { name: "Imad Sabagh", allowedGuests: 1 },
-    "654321": { name: "Lea Martin", allowedGuests: 2 },
-    "111111": { name: "Famille Dubois", allowedGuests: 4 }
-    // Ajoutez/modifiez les codes ici
+    "123456": { name: "Imad Sabagh", allowedGuests: 10 },
+    "654321": { name: "Lea Martin", allowedGuests: 10 },
+    "111111": { name: "Famille Dubois", allowedGuests: 10 }
 };
+const SECRET_CODE = "999999";
+const WEDDING_DATE = new Date("2025-12-31T17:00:00"); // Modifier la date du mariage
 
-const SECRET_CODE = "999999"; // Code spécial pour la page secrète
-
+// Vérifier code invité ou admin
 function checkCode(){
     const code = document.getElementById('code').value.trim();
-    const errorDiv = document.getElementById('error');
-    errorDiv.textContent = '';
-
-    if(!/^\d{6}$/.test(code)){
-        errorDiv.textContent = "Le code doit contenir exactement 6 chiffres.";
-        return;
-    }
-
-    if(code === SECRET_CODE){
-        showSecretPage();
-        return;
-    }
-
+    const errorDiv = document.getElementById('error'); errorDiv.textContent = '';
+    if(!/^\d{6}$/.test(code)){ errorDiv.textContent = "Le code doit contenir exactement 6 chiffres."; return; }
+    if(code === SECRET_CODE){ showAdminPage(); return; }
     const guest = GUESTS_DB[code];
-    if(!guest){
-        errorDiv.textContent = "Code introuvable. Vérifiez le code ou contactez les mariés.";
-        return;
-    }
-
+    if(!guest){ errorDiv.textContent = "Code introuvable."; return; }
     document.getElementById('welcome').textContent = `Bonjour ${guest.name} 👋`;
-    const plusOnesSelect = document.getElementById('plusOnes');
-    plusOnesSelect.innerHTML = '';
-    for(let i=0;i<=guest.allowedGuests;i++){
-        let opt = document.createElement('option');
-        opt.value = i;
-        opt.text = i;
-        plusOnesSelect.appendChild(opt);
-    }
-
-    document.getElementById('form-step1').classList.add('hidden');
-    document.getElementById('form-step2').classList.remove('hidden');
+    const plusOnesSelect = document.getElementById('plusOnes'); plusOnesSelect.innerHTML = '';
+    for(let i=0;i<=guest.allowedGuests;i++){ let opt = document.createElement('option'); opt.value=i; opt.text=i; plusOnesSelect.appendChild(opt); }
+    document.getElementById('form-step1').classList.replace('show','hidden');
+    document.getElementById('form-step2').classList.replace('hidden','show');
     document.getElementById('form-step2').dataset.code = code;
 }
 
+// Génération champs accompagnants
+document.getElementById('plusOnes').addEventListener('change', function() {
+    const count = parseInt(this.value);
+    const container = document.getElementById('accompanistNames'); container.innerHTML = '';
+    for(let i=1;i<=count;i++){
+        const input = document.createElement('input'); input.type='text';
+        input.placeholder = `Prénom accompagnant ${i}`; input.className='accompName'; input.required=true;
+        container.appendChild(input);
+    }
+});
+
+// Soumission RSVP
 function submitRsvp(){
     const status = document.getElementById('status').value;
     const plusOnes = document.getElementById('plusOnes').value;
     const code = document.getElementById('form-step2').dataset.code;
     const guest = GUESTS_DB[code];
-
-    if(!status){
-        alert("Veuillez indiquer si vous serez présent(e) ou non.");
-        return;
-    }
-
-    let submissions = JSON.parse(localStorage.getItem('rsvp_submissions') || '[]');
-    submissions = submissions.filter(s => s.code !== code);
-    submissions.push({ code, name: guest.name, status, plusOnes, when: new Date().toISOString() });
+    if(!status){ alert("Veuillez indiquer si vous serez présent(e)."); return; }
+    const accompNames = Array.from(document.querySelectorAll('.accompName')).map(i=>i.value.trim());
+    if(accompNames.includes("")){ alert("Veuillez remplir le prénom de chaque accompagnant."); return; }
+    const comments = document.getElementById('comments').value.trim();
+    let submissions = JSON.parse(localStorage.getItem('rsvp_submissions')||'[]');
+    submissions = submissions.filter(s=>s.code!==code);
+    submissions.push({ code, name: guest.name, status, plusOnes, accompNames, comments, when:new Date().toISOString() });
     localStorage.setItem('rsvp_submissions', JSON.stringify(submissions));
-
-    document.getElementById('form-step2').classList.add('hidden');
-    document.getElementById('thankyou').classList.remove('hidden');
+    document.getElementById('form-step2').classList.replace('show','hidden');
+    document.getElementById('thankyou').classList.replace('hidden','show');
+    updateCounter(); startCountdown();
 }
 
-function showSecretPage(){
-    const submissions = JSON.parse(localStorage.getItem('rsvp_submissions') || '[]');
-    document.body.innerHTML = `
-        <div style="padding:30px;font-family:sans-serif;background:linear-gradient(135deg,#f5f0e6,#e0d7c6);min-height:100vh;">
-            <h1 style="color:#5a4633;">Page Secrète — Liste des RSVP</h1>
-            <table>
-                <tr><th>Code</th><th>Nom</th><th>Status</th><th>Accompagnants</th><th>Date</th></tr>
-                ${submissions.map(r=>`
-                    <tr>
-                        <td>${r.code}</td>
-                        <td>${r.name}</td>
-                        <td>${r.status}</td>
-                        <td>${r.plusOnes}</td>
-                        <td>${new Date(r.when).toLocaleString()}</td>
-                    </tr>
-                `).join('')}
-            </table>
-            <button onclick="location.reload()" style="margin-top:20px;padding:10px 20px;background:#b9975b;color:white;border:none;border-radius:10px;cursor:pointer;">Retour</button>
-        </div>
-    `;
+// Compteur total invités
+function updateCounter(){
+    const submissions = JSON.parse(localStorage.getItem('rsvp_submissions')||'[]'); let total=0;
+    submissions.forEach(r=>{ if(r.status==='present') total+=1+parseInt(r.plusOnes); });
+    document.getElementById('counter').textContent = `Total invités confirmés : ${total}`;
 }
+
+// Compte à rebours mariage
+function startCountdown(){
+    const now = new Date(); const diff = WEDDING_DATE - now;
+    if(diff<=0){ document.getElementById('countdown').textContent = "Le mariage a déjà eu lieu !"; return; }
+    const days = Math.floor(diff/1000/60/60/24);
+    const hours = Math.floor((diff/1000/60/60)%24);
+    const minutes = Math.floor((diff/1000/60)%60);
+    const seconds = Math.floor((diff/1000)%60);
+    document.getElementById('countdown').textContent = `Jusqu'au mariage : ${days}j ${hours}h ${minutes}m ${seconds}s`;
+    setTimeout(startCountdown,1000);
+}
+
+// Page admin
+function showAdminPage(){
+    const submissions = JSON.parse(localStorage.getItem('rsvp_submissions')||'[]');
+    document.body.innerHTML = `<div style="padding:30px;font-family:sans-serif;background:linear-gradient(135deg,#f5f0e6,#e0d7c6);min-height:100vh;">
+        <h1 style="color:#5a4633;">Page Admin — Gestion des invités</h1>
+        <button class="export-btn" onclick="exportCSV()">Exporter CSV</button>
+        <table id="adminTable">
+        <tr><th>Code</th><th>Nom</th><th>Status</th><th>Accompagnants</th><th>Prénoms</th><th>Commentaires</th><th>Date</th><th>Actions</th></tr>
+        ${submissions.map(r=>`<tr data-code="${r.code}">
+            <td>${r.code}</td><td>${r.name}</td>
+            <td><select onchange="updateStatus('${r.code}',this.value)">
+                <option value="present" ${r.status==='present'?'selected':''}>Présent(e)</option>
+                <option value="absent" ${r.status==='absent'?'selected':''}>Non présent(e)</option></select></td>
+            <td><input type="number" min="0" value="${r.plusOnes}" onchange="updatePlusOnes('${r.code}',this.value)"></td>
+            <td>${r.accompNames.join(", ")}</td><td>${r.comments}</td>
+            <td>${new Date(r.when).toLocaleString()}</td>
+            <td><button onclick="deleteGuest('${r.code}')">Supprimer</button></td>
+        </tr>`).join('')}
+        </table>
+        <button onclick="location.reload()" style="margin-top:20px;padding:10px 20px;background:#b9975b;color:white;border:none;border-radius:10px;cursor:pointer;">Retour</button>
+    </div>`;
+}
+
+// Admin fonctions
+function deleteGuest(code){ let submissions=JSON.parse(localStorage.getItem('rsvp_submissions')||'[]'); submissions=submissions.filter(r=>r.code!==code); localStorage.setItem('rsvp_submissions',JSON.stringify(submissions)); showAdminPage(); }
+function updateStatus(code,value){ let submissions=JSON.parse(localStorage.getItem('rsvp_submissions')||'[]'); submissions=submissions.map(r=>r.code===code?{...r,status:value}:r); localStorage.setItem('rsvp_submissions',JSON.stringify(submissions)); }
+function updatePlusOnes(code,value){ let submissions=JSON.parse(localStorage.getItem('rsvp_submissions')||'[]'); submissions=submissions.map(r=>r.code===code?{...r,plusOnes:value}:r); localStorage.setItem('rsvp_submissions',JSON.stringify(submissions)); }
+function exportCSV(){ const submissions=JSON.parse(localStorage.getItem('rsvp_submissions')||'[]'); let csv="Code,Nom,Status,Accompagnants,Prénoms,Commentaires,Date\n"; submissions.forEach(r=>{ csv+=`${r.code},${r.name},${r.status},${r.plusOnes},"${r.accompNames.join("; ")}","${r.comments}",${new Date(r.when).toLocaleString()}\n`; }); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const link=document.createElement("a"); link.href=URL.createObjectURL(blob); link.download="RSVP_mariage.csv"; link.click(); }
 </script>
 </body>
 </html>
+
+
+
+
+
 
 
